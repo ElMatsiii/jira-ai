@@ -1,0 +1,270 @@
+# MS1: Issues Service (Go)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: issues-service
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: issues-service
+  template:
+    metadata:
+      labels:
+        app: issues-service
+    spec:
+      containers:
+        - name: issues-service
+          image: jira-issues-service:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "50051"
+            - name: DB_HOST
+              value: "postgres-issues"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "jira_user"
+            - name: DB_PASSWORD
+              value: "jira_password"
+            - name: DB_NAME
+              value: "issues_db"
+            - name: KAFKA_BROKERS
+              value: "kafka:9092"
+          ports:
+            - containerPort: 50051
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: issues-service
+  namespace: jira-ai
+spec:
+  selector:
+    app: issues-service
+  ports:
+    - port: 50051
+      targetPort: 50051
+---
+# MS2: Sprints Service (NestJS)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sprints-service
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sprints-service
+  template:
+    metadata:
+      labels:
+        app: sprints-service
+    spec:
+      containers:
+        - name: sprints-service
+          image: jira-sprints-service:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "50052"
+            - name: DB_HOST
+              value: "postgres-sprints"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "jira_user"
+            - name: DB_PASSWORD
+              value: "jira_password"
+            - name: DB_NAME
+              value: "sprints_db"
+            - name: MS1_GRPC_URL
+              value: "issues-service:50051"
+            - name: KAFKA_BROKERS
+              value: "kafka:9092"
+          ports:
+            - containerPort: 50052
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sprints-service
+  namespace: jira-ai
+spec:
+  selector:
+    app: sprints-service
+  ports:
+    - port: 50052
+      targetPort: 50052
+---
+# MS3: Analytics Service (.NET 8)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+        - name: analytics-service
+          image: jira-analytics-service:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MONGODB_URI
+              value: "mongodb://mongo-analytics:27017"
+            - name: MONGODB_DATABASE
+              value: "analytics_db"
+            - name: KAFKA_BROKERS
+              value: "kafka:9092"
+            - name: SPRINTS_GRPC_URL
+              value: "http://sprints-service:50052"
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: jira-ai
+spec:
+  selector:
+    app: analytics-service
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# AI Layer: MCP Server (Node.js/TypeScript)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-agent
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-agent
+  template:
+    metadata:
+      labels:
+        app: mcp-agent
+    spec:
+      containers:
+        - name: mcp-agent
+          image: jira-mcp-agent:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "3000"
+            - name: GEMINI_MODEL
+              value: "gemini-2.0-flash"
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-agent
+  namespace: jira-ai
+spec:
+  selector:
+    app: mcp-agent
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+# BFF Layer: API Gateway (NestJS + GraphQL)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bff-gateway
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bff-gateway
+  template:
+    metadata:
+      labels:
+        app: bff-gateway
+    spec:
+      containers:
+        - name: bff-gateway
+          image: jira-bff-gateway:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "4000"
+            - name: ISSUES_GRPC_URL
+              value: "issues-service:50051"
+            - name: SPRINTS_GRPC_URL
+              value: "sprints-service:50052"
+            - name: KAFKA_BROKERS
+              value: "kafka:9092"
+            - name: MCP_AGENT_URL
+              value: "http://mcp-agent:3000"
+          ports:
+            - containerPort: 4000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bff-gateway
+  namespace: jira-ai
+spec:
+  type: LoadBalancer
+  selector:
+    app: bff-gateway
+  ports:
+    - port: 4000
+      targetPort: 4000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-frontend
+  namespace: jira-ai
+  labels:
+    app: web-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-frontend
+  template:
+    metadata:
+      labels:
+        app: web-frontend
+    spec:
+      containers:
+        - name: web-frontend
+          image: jira-web-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-frontend
+  namespace: jira-ai
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+

@@ -1,0 +1,21 @@
+[submodule "jira-contracts"]
+	path = jira-contracts
+	url = https://github.com/ElMatsiii/jira-contracts.git
+[submodule "jira-issues-go"]
+	path = jira-issues-go
+	url = https://github.com/ElMatsiii/jira-issues-go.git
+[submodule "jira-sprints-nestjs"]
+	path = jira-sprints-nestjs
+	url = https://github.com/ElMatsiii/jira-sprints-nestjs.git
+[submodule "jira-analytics-dotnet"]
+	path = jira-analytics-dotnet
+	url = https://github.com/ElMatsiii/jira-analytics-dotnet.git
+[submodule "jira-mcp-agent"]
+	path = jira-mcp-agent
+	url = https://github.com/ElMatsiii/jira-mcp-agent.git
+[submodule "jira-bff"]
+	path = jira-bff
+	url = https://github.com/ElMatsiii/jira-bff.git
+[submodule "jira-web"]
+	path = jira-web
+	url = https://github.com/ElMatsiii/jira-web.git

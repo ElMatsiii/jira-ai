@@ -1,0 +1,198 @@
+# 1. PostgreSQL - Issues DB
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-issues
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-issues
+  template:
+    metadata:
+      labels:
+        app: postgres-issues
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_USER
+              value: "jira_user"
+            - name: POSTGRES_PASSWORD
+              value: "jira_password"
+            - name: POSTGRES_DB
+              value: "issues_db"
+          ports:
+            - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-issues
+  namespace: jira-ai
+spec:
+  selector:
+    app: postgres-issues
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# 2. PostgreSQL - Sprints DB
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-sprints
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-sprints
+  template:
+    metadata:
+      labels:
+        app: postgres-sprints
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_USER
+              value: "jira_user"
+            - name: POSTGRES_PASSWORD
+              value: "jira_password"
+            - name: POSTGRES_DB
+              value: "sprints_db"
+          ports:
+            - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-sprints
+  namespace: jira-ai
+spec:
+  selector:
+    app: postgres-sprints
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# 3. MongoDB - Analytics DB
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-analytics
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-analytics
+  template:
+    metadata:
+      labels:
+        app: mongo-analytics
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7.0
+          ports:
+            - containerPort: 27017
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-analytics
+  namespace: jira-ai
+spec:
+  selector:
+    app: mongo-analytics
+  ports:
+    - port: 27017
+      targetPort: 27017
+---
+# 4. Zookeeper & Kafka Broker
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+        - name: zookeeper
+          image: confluentinc/cp-zookeeper:7.5.0
+          env:
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: "2181"
+            - name: ZOOKEEPER_TICK_TIME
+              value: "2000"
+          ports:
+            - containerPort: 2181
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: jira-ai
+spec:
+  selector:
+    app: zookeeper
+  ports:
+    - port: 2181
+      targetPort: 2181
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: jira-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:7.5.0
+          env:
+            - name: KAFKA_BROKER_ID
+              value: "1"
+            - name: KAFKA_ZOOKEEPER_CONNECT
+              value: "zookeeper:2181"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka:9092"
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+          ports:
+            - containerPort: 9092
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: jira-ai
+spec:
+  selector:
+    app: kafka
+  ports:
+    - port: 9092
+      targetPort: 9092

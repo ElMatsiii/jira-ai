@@ -1,0 +1,24 @@
+{
+  "name": "jira-ai-e2e-tests",
+  "version": "1.0.0",
+  "description": "Opaque-box E2E test suite for Jira AI platform",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types run-e2e.ts",
+    "test:tier1": "node --experimental-strip-types --test suites/tier1-features.test.ts",
+    "test:tier2": "node --experimental-strip-types --test suites/tier2-boundaries.test.ts",
+    "test:tier3": "node --experimental-strip-types --test suites/tier3-pairwise.test.ts",
+    "test:tier4": "node --experimental-strip-types --test suites/tier4-scenarios.test.ts"
+  },
+  "keywords": [
+    "e2e",
+    "opaque-box",
+    "jira-ai",
+    "graphql",
+    "grpc",
+    "kafka",
+    "mcp"
+  ],
+  "author": "Jira AI Quality Engineering Team",
+  "license": "Apache-2.0"
+}

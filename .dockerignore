@@ -1,0 +1,12 @@
+**/.git
+**/.github
+**/.agents
+**/node_modules
+**/dist
+**/bin
+**/obj
+**/coverage
+**/.expo
+**/.vscode
+**/*.log
+tests/

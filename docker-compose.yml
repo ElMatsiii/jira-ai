@@ -1,0 +1,201 @@
+version: '3.8'
+
+services:
+  # Infrastructure: Zookeeper & Kafka Broker
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: jira-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - jira-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: jira-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - jira-network
+
+  # Database 1: PostgreSQL for MS1 Issues & Projects
+  postgres-issues:
+    image: postgres:15-alpine
+    container_name: jira-postgres-issues
+    environment:
+      POSTGRES_USER: jira_user
+      POSTGRES_PASSWORD: jira_password
+      POSTGRES_DB: issues_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_issues_data:/var/lib/postgresql/data
+    networks:
+      - jira-network
+
+  # Database 2: PostgreSQL for MS2 Sprints & Planning
+  postgres-sprints:
+    image: postgres:15-alpine
+    container_name: jira-postgres-sprints
+    environment:
+      POSTGRES_USER: jira_user
+      POSTGRES_PASSWORD: jira_password
+      POSTGRES_DB: sprints_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_sprints_data:/var/lib/postgresql/data
+    networks:
+      - jira-network
+
+  # Database 3: MongoDB for MS3 Analytics & Metrics
+  mongo-analytics:
+    image: mongo:7.0
+    container_name: jira-mongo-analytics
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_analytics_data:/data/db
+    networks:
+      - jira-network
+
+  # MS1: Issues Service (Go)
+  issues-service:
+    build:
+      context: .
+      dockerfile: ./jira-issues-go/Dockerfile
+    container_name: jira-issues-service
+    depends_on:
+      - postgres-issues
+      - kafka
+    environment:
+      PORT: "50051"
+      DATABASE_URL: postgres://jira_user:jira_password@postgres-issues:5432/issues_db?sslmode=disable
+      DB_HOST: postgres-issues
+      DB_PORT: "5432"
+      DB_USER: jira_user
+      DB_PASSWORD: jira_password
+      DB_NAME: issues_db
+      KAFKA_BROKERS: kafka:9092
+    ports:
+      - "50051:50051"
+    networks:
+      - jira-network
+
+  # MS2: Sprints Service (NestJS)
+  sprints-service:
+    build:
+      context: .
+      dockerfile: ./jira-sprints-nestjs/Dockerfile
+    container_name: jira-sprints-service
+    depends_on:
+      - postgres-sprints
+      - issues-service
+      - kafka
+    environment:
+      PORT: "50052"
+      DB_HOST: postgres-sprints
+      DB_PORT: "5432"
+      DB_USER: jira_user
+      DB_PASSWORD: jira_password
+      DB_NAME: sprints_db
+      MS1_GRPC_URL: issues-service:50051
+      KAFKA_BROKERS: kafka:9092
+    ports:
+      - "50052:50052"
+    networks:
+      - jira-network
+
+  # MS3: Analytics Service (.NET 8)
+  analytics-service:
+    build:
+      context: ./jira-analytics-dotnet
+      dockerfile: Dockerfile
+    container_name: jira-analytics-service
+    depends_on:
+      - mongo-analytics
+      - sprints-service
+      - kafka
+    environment:
+      MONGODB_URI: mongodb://mongo-analytics:27017
+      MONGODB_DATABASE: analytics_db
+      KAFKA_BROKERS: kafka:9092
+      SPRINTS_GRPC_URL: http://sprints-service:50052
+    ports:
+      - "8080:8080"
+    networks:
+      - jira-network
+
+  # AI Layer: MCP Server (Node.js/TypeScript + Gemini 2.0 Flash)
+  mcp-agent:
+    build:
+      context: ./jira-mcp-agent
+      dockerfile: Dockerfile
+    container_name: jira-mcp-agent
+    environment:
+      PORT: "3000"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      GEMINI_MODEL: "gemini-2.0-flash"
+    ports:
+      - "3000:3000"
+    networks:
+      - jira-network
+
+  # BFF Layer: API Gateway (NestJS + GraphQL)
+  bff-gateway:
+    build:
+      context: .
+      dockerfile: ./jira-bff/Dockerfile
+    container_name: jira-bff-gateway
+    depends_on:
+      - issues-service
+      - sprints-service
+      - analytics-service
+      - mcp-agent
+    environment:
+      PORT: "4000"
+      ISSUES_GRPC_URL: issues-service:50051
+      SPRINTS_GRPC_URL: sprints-service:50052
+      KAFKA_BROKERS: kafka:9092
+      MCP_AGENT_URL: http://mcp-agent:3000
+    ports:
+      - "4000:4000"
+    networks:
+      - jira-network
+
+  # Frontend Web: React 18 + Vite / Nginx
+  web-frontend:
+    build:
+      context: ./jira-web
+      dockerfile: Dockerfile
+    container_name: jira-web-frontend
+    depends_on:
+      - bff-gateway
+    ports:
+      - "5173:80"
+      - "80:80"
+    networks:
+      - jira-network
+
+volumes:
+  pg_issues_data:
+  pg_sprints_data:
+  mongo_analytics_data:
+
+networks:
+  jira-network:
+    driver: bridge

@@ -1,0 +1,23 @@
+# Environment configuration
+.env
+.env.local
+
+# Deprecated/experimental directories
+jira-mobile/
+.agents/
+
+# Dependencies and build outputs
+node_modules/
+vendor/
+dist/
+build/
+bin/
+obj/
+coverage/
+*.out
+*.log
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
