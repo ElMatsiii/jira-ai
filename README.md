@@ -76,6 +76,7 @@ docker compose up -d
 * **MCP Agent Health:** [http://localhost:3000/health](http://localhost:3000/health)
 * **MS1 Issues (gRPC):** `localhost:50051`
 * **MS2 Sprints (gRPC):** `localhost:50052`
+* **MS3 Analytics Worker (HTTP Health):** [http://localhost:8080/healthz](http://localhost:8080/healthz)
 * **Apache Kafka Broker:** `localhost:9092` (externo: `localhost:29092`)
 * **PostgreSQL Incidencias (MS1):** `localhost:5434` (`issues_db`)
 * **PostgreSQL Sprints (MS2):** `localhost:5433` (`sprints_db`)
