@@ -5,12 +5,11 @@ This test suite performs comprehensive opaque-box (black-box) end-to-end integra
 ## Test Architecture
 
 - **Opaque-Box Principles**: Tests interact exclusively through observable external service boundaries:
-  - **BFF GraphQL Gateway**: `/graphql` (HTTP POST)
-  - **MCP Agent REST API**: `/agent/decompose-epic`, `/agent/plan-sprint`, `/agent/diagnose-metrics` (HTTP POST)
-  - **Kafka Streaming**: `issues.events`, `analytics.query`, `analytics.reply`
-  - **gRPC Services**: `IssueService` (:50051), `SprintService` / `AlertService` (:50052)
-- **Zero-Dependency Execution**: Powered by Node.js 24 (`node --experimental-strip-types`) with an embedded mock cluster simulating the 6 distributed backend services for deterministic, lightning-fast testing during development.
-- **Live Cluster Mode**: Supports testing directly against running Docker Compose or Kubernetes clusters by setting `E2E_TARGET=live`.
+  - The simulated **BFF GraphQL Gateway**: `/graphql` (HTTP POST)
+  - The simulated **MCP Agent REST API**: `/agent/decompose-epic`, `/agent/plan-sprint`, `/agent/diagnose-metrics` (HTTP POST)
+  - Simulated Kafka and gRPC interactions in the mock cluster
+- **Zero-Dependency Execution**: Powered by Node.js 22.6+ (`node --experimental-strip-types`) with an embedded mock cluster simulating the distributed backend services for deterministic, fast contract-flow tests.
+- **Live Smoke Checks**: `npm run smoke:live` checks the real frontend, BFF GraphQL endpoint, and MCP health endpoint after starting Docker Compose. This is a connectivity check, not a full live business-flow suite.
 
 ## Directory Structure
 
@@ -44,9 +43,8 @@ npm run test:tier2   # Boundary & Adversarial Cases
 npm run test:tier3   # Pairwise Combinations
 npm run test:tier4   # Real-World Workload Scenarios
 
-# Run against live containers (Docker Compose / K8s)
-set E2E_TARGET=live
-set BFF_URL=http://localhost:4000
-set MCP_URL=http://localhost:3000
-npm test
+# Run smoke checks against live containers (Docker Compose / K8s)
+npm run smoke:live
 ```
+
+The `npm test` suites always use `MockCluster`; they do not connect to Docker or Kubernetes. Optional `BFF_URL`, `MCP_URL`, and `WEB_URL` variables configure the live smoke-check targets.

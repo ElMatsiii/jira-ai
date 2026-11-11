@@ -27,7 +27,9 @@ El proyecto está organizado en una arquitectura **multi-repositorio** vinculada
 
 ---
 
-## 2. Onboarding y Clonación para Colaboradores
+## 2. Requisitos y clonación
+
+Para ejecutar todo el stack localmente necesitas Docker Desktop con el motor Linux y Docker Compose v2. Para la suite mock basta Node.js 22.6 o superior (recomendado: Node.js 24). Para ejecutar servicios fuera de contenedores instala además Go 1.22+, Node.js 20+ y .NET 8 SDK.
 
 Para clonar la plataforma completa con todos los submódulos de microservicios:
 
@@ -57,23 +59,29 @@ git submodule update --init --recursive
 
 ## 3. Puesta en Marcha
 
-### Configuración de Variables de Entorno
-Copia la plantilla de entorno:
+### Configuración de variables de entorno
+En PowerShell:
+```powershell
+Copy-Item .env.example .env
+```
+En Linux/macOS:
 ```bash
 cp .env.example .env
 ```
-*(Opcional: Añade tu clave `GEMINI_API_KEY` en `.env` para habilitar el agente IA en modo interactivo en vivo).*
+`GEMINI_API_KEY` es opcional: el agente puede responder usando su fallback local si no configuras una clave.
 
 ### Levantar Todo el Ecosistema (Docker Compose)
-Levanta los 11 contenedores (PostgreSQL x2, MongoDB, Kafka, Zookeeper, microservicios, gateway y web):
+Desde la raíz del repositorio, construye y levanta los servicios:
 ```bash
-docker compose up -d
+docker compose up --build -d
+docker compose ps
 ```
+La primera construcción puede tardar varios minutos. Compose espera a que PostgreSQL, MongoDB y Kafka pasen sus healthchecks antes de arrancar los consumidores. Para ver los logs: `docker compose logs -f`; para apagar el stack sin borrar datos: `docker compose down`.
 
 ### Endpoints y Puertos Principales
 * **Frontend Web:** [http://localhost:5173](http://localhost:5173) (o puerto `:80` en producción)
 * **BFF GraphQL Playground:** [http://localhost:4000/graphql](http://localhost:4000/graphql)
-* **MCP Agent Health:** [http://localhost:3000/health](http://localhost:3000/health)
+* **MCP Agent Health:** [http://localhost:3000/healthz](http://localhost:3000/healthz)
 * **MS1 Issues (gRPC):** `localhost:50051`
 * **MS2 Sprints (gRPC):** `localhost:50052`
 * **MS3 Analytics Worker (HTTP Health):** [http://localhost:8080/healthz](http://localhost:8080/healthz)
@@ -81,6 +89,21 @@ docker compose up -d
 * **PostgreSQL Incidencias (MS1):** `localhost:5434` (`issues_db`)
 * **PostgreSQL Sprints (MS2):** `localhost:5433` (`sprints_db`)
 * **MongoDB Analítica (MS3):** `localhost:27017` (`analytics_db`)
+
+### Probar el flujo de usuario
+1. Abre `http://localhost:5173` y crea una cuenta con nombre, email y una contraseña de al menos 10 caracteres. El registro crea un espacio de trabajo personal.
+2. Crea un proyecto con nombre y una clave de 2 a 10 caracteres (por ejemplo, `DEMO`). Los proyectos y sus historias se comparten con los miembros del espacio.
+3. Para colaborar, la otra persona primero debe registrarse; luego un propietario o administrador puede agregarla por email desde la barra del espacio. Esta versión no envía invitaciones por correo.
+4. En **Backlog**, crea historias, tareas o bugs. La opción de mejora con IA puede proponer puntos de historia y criterios de aceptación; revisa la propuesta antes de guardarla. También puedes usar el panel de IA para desglosar una épica y crear las historias sugeridas.
+5. En **Cronograma**, crea un sprint con fechas y objetivo, asigna historias desde el backlog e inicia el sprint. El **Tablero** muestra las historias asignadas al sprint activo.
+6. En **Rendimiento**, registra horas por historia y usa **Analizar sprint con IA** para recibir un diagnóstico y recomendaciones. Los registros son tiempo observado, no una estimación; las horas por sí solas no miden productividad ni desviación respecto de lo planificado.
+
+Sin `GEMINI_API_KEY`, las acciones de IA usan el motor heurístico local. Para habilitar Gemini, agrega la clave a `.env` y reconstruye el agente:
+```powershell
+docker compose up -d --build mcp-agent
+```
+
+`JWT_SECRET` firma las sesiones de 12 horas. El valor del `.env.example` es solo para desarrollo local; sustitúyelo por un secreto aleatorio y privado antes de cualquier despliegue no local. No compartas el archivo `.env`.
 
 ---
 
@@ -94,30 +117,52 @@ docker compose up -d postgres-issues postgres-sprints mongo-analytics kafka zook
 ```
 
 ### Paso 2: Ejecutar el microservicio en modo local
+Para BFF y Sprints, compila primero `jira-contracts` (`npm ci` y `npm run build`) y ejecuta `npm ci` en cada repositorio Node antes de iniciarlo. En esta modalidad local, Kafka se alcanza por el listener publicado `localhost:29092`; dentro de Docker, los servicios usan `kafka:9092`. Ejecuta cada servicio en una terminal separada.
+
 * **MS1 (Go):**
-  ```bash
-  cd jira-issues-go
+  ```powershell
+  Push-Location jira-issues-go
+  $env:DATABASE_URL = "postgres://jira_user:jira_password@localhost:5434/issues_db?sslmode=disable"
+  $env:KAFKA_BROKERS = "localhost:29092"
   go run cmd/server/main.go
+  Pop-Location
   ```
 * **MS2 (NestJS):**
-  ```bash
-  cd jira-sprints-nestjs
+  ```powershell
+  Push-Location jira-sprints-nestjs
+  $env:DB_HOST = "localhost"; $env:DB_PORT = "5433"
+  $env:DB_USER = "jira_user"; $env:DB_PASSWORD = "jira_password"; $env:DB_NAME = "sprints_db"
+  $env:KAFKA_BROKERS = "localhost:29092"; $env:MS1_GRPC_URL = "localhost:50051"
   npm run start:dev
+  Pop-Location
   ```
 * **MS3 (.NET 8):**
-  ```bash
-  cd jira-analytics-dotnet
-  dotnet run --project src/JiraAnalytics.Api
+  ```powershell
+  Push-Location jira-analytics-dotnet
+  $env:MONGODB_URI = "mongodb://localhost:27017"; $env:MONGODB_DATABASE = "analytics_db"
+  $env:KAFKA_BROKERS = "localhost:29092"; $env:MS2_GRPC_URL = "http://localhost:50052"
+  dotnet run --project src/JiraAi.Analytics.Worker
+  Pop-Location
+  ```
+* **Agente MCP:**
+  ```powershell
+  Push-Location jira-mcp-agent
+  npm run dev
+  Pop-Location
   ```
 * **BFF Gateway (NestJS GraphQL):**
-  ```bash
-  cd jira-bff
+  ```powershell
+  Push-Location jira-bff
+  $env:ISSUES_GRPC_URL = "localhost:50051"; $env:SPRINTS_GRPC_URL = "localhost:50052"
+  $env:KAFKA_BROKERS = "localhost:29092"; $env:MCP_AGENT_URL = "http://localhost:3000"
   npm run start:dev
+  Pop-Location
   ```
 * **Frontend Web (React 18):**
-  ```bash
-  cd jira-web
+  ```powershell
+  Push-Location jira-web
   npm run dev
+  Pop-Location
   ```
 
 ---
@@ -125,20 +170,47 @@ docker compose up -d postgres-issues postgres-sprints mongo-analytics kafka zook
 ## 5. Pruebas y Validación Técnica para Desarrolladores
 
 ### Pruebas Unitarias y de Cobertura por Servicio
-Cada microservicio cuenta con su propia suite aislada:
-* **Go:** `go test -v -coverprofile=coverage.out ./...`
-* **NestJS / TypeScript:** `npm test -- --coverage`
-* **.NET 8:** `dotnet test --collect:"XPlat Code Coverage"`
-* **React Web:** `npm test -- --coverage`
+La suite rápida mock no requiere instalar dependencias:
+```bash
+cd tests/e2e
+npm test
+```
+Esta suite simula los límites de los servicios; no arranca contenedores ni prueba la integración real. Para verificar los servicios levantados con Docker, usa la comprobación smoke más abajo.
+
+Para las pruebas unitarias:
+* **Contratos compartidos:** ejecuta `npm ci` y `npm run build` en `jira-contracts` antes de instalar BFF y Sprints (ambos dependen del paquete local generado):
+  ```powershell
+  Push-Location jira-contracts
+  npm ci
+  npm run build
+  Pop-Location
+  ```
+* **BFF y Sprints:** desde cada carpeta ejecuta `npm ci`, `npm run test:coverage` y `npm run build`.
+* **Agente MCP:** desde `jira-mcp-agent`, ejecuta `npm ci`, `npm run test:coverage` y `npm run build`.
+* **Contratos:** desde `jira-contracts`, ejecuta `npm test -- --coverage`.
+* **Go:** desde `jira-issues-go`, ejecuta `go test -v -coverprofile=coverage.out ./...`.
+* **.NET 8:** desde `jira-analytics-dotnet`, ejecuta `dotnet test tests/JiraAi.Analytics.UnitTests/JiraAi.Analytics.UnitTests.csproj`.
+* **React Web:** desde `jira-web`, ejecuta `npm ci`, `npm test` y `npm run build`.
+
+### Verificación del stack Docker en vivo
+Con los contenedores arriba, desde `tests/e2e` ejecuta:
+```bash
+npm run smoke:live
+```
+Verifica que la web responda, que el BFF acepte una consulta GraphQL y que el agente MCP responda en `/healthz`. No reemplaza pruebas de flujos de negocio. Para comprobar manualmente:
+```powershell
+Invoke-RestMethod http://localhost:3000/healthz
+Invoke-RestMethod -Uri http://localhost:4000/graphql -Method Post -ContentType 'application/json' -Body '{"query":"{ __typename }"}'
+```
 
 ### Pruebas de Endpoints gRPC sin Frontend
-Los servicios backend gRPC se pueden probar directamente usando contratos Protobuf (`jira-contracts/proto/`):
+Los servicios backend gRPC se pueden probar directamente usando contratos Protobuf (`jira-contracts/protos/`):
 * **Postman / Insomnia:** Crear petición de tipo `gRPC`, apuntar a `localhost:50051` o `localhost:50052`, cargar el archivo `.proto` y enviar peticiones directas.
 * **grpcurl (Terminal):**
   ```bash
-  grpcurl -plaintext -proto ./jira-contracts/proto/issues.proto \
+  grpcurl -plaintext -proto ./jira-contracts/protos/issues.proto \
     -d '{"title": "Nueva Incidencia", "project_id": "PROJ-1"}' \
-    localhost:50051 jira.issues.v1.IssuesService/CreateIssue
+    localhost:50051 jira.issues.v1.IssueService/CreateIssue
   ```
 
 ### Verificación de Eventos en Apache Kafka
@@ -167,3 +239,4 @@ kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/infrastructure/databases-and-kafka.yaml
 kubectl apply -f k8s/apps/microservices-and-bff.yaml
 ```
+Estos manifiestos sirven como base de demostración; aún requieren persistencia duradera para las bases de datos, gestión de secretos y probes antes de considerarse listos para producción. Para probar todo localmente, se recomienda Docker Compose.

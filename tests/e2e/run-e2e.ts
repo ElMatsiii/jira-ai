@@ -10,7 +10,7 @@ async function main() {
   console.log('  JIRA AI DISTRIBUTED PLATFORM - OPAQUE-BOX E2E TEST SUITE     ');
   console.log('================================================================');
   console.log(`Node.js Runtime : ${process.version}`);
-  console.log(`Execution Mode  : ${process.env.E2E_TARGET === 'live' ? 'LIVE CLUSTER' : 'STANDALONE MOCK CLUSTER'}`);
+  console.log('Execution Mode  : STANDALONE MOCK CLUSTER (does not connect to Docker/Kubernetes)');
   console.log(`Timestamp       : ${new Date().toISOString()}`);
   console.log('----------------------------------------------------------------\n');
 

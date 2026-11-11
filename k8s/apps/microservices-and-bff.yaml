@@ -127,7 +127,7 @@ spec:
               value: "analytics_db"
             - name: KAFKA_BROKERS
               value: "kafka:9092"
-            - name: SPRINTS_GRPC_URL
+            - name: MS2_GRPC_URL
               value: "http://sprints-service:50052"
           ports:
             - containerPort: 8080
@@ -267,4 +267,3 @@ spec:
   ports:
     - port: 80
       targetPort: 80
-

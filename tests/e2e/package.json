@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --experimental-strip-types run-e2e.ts",
+    "smoke:live": "node smoke-live.mjs",
     "test:tier1": "node --experimental-strip-types --test suites/tier1-features.test.ts",
     "test:tier2": "node --experimental-strip-types --test suites/tier2-boundaries.test.ts",
     "test:tier3": "node --experimental-strip-types --test suites/tier3-pairwise.test.ts",
