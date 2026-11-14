@@ -168,7 +168,10 @@ spec:
             - name: PORT
               value: "3000"
             - name: GEMINI_MODEL
-              value: "gemini-2.0-flash"
+              value: "gemini-3.5-flash-lite"
+            # Below the BFF's 15 s timeout towards the agent; decompose-epic measured ~8.5 s.
+            - name: GEMINI_TIMEOUT_MS
+              value: "13000"
           ports:
             - containerPort: 3000
 ---

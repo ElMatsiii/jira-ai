@@ -202,7 +202,9 @@ services:
     environment:
       PORT: "3000"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
-      GEMINI_MODEL: "gemini-2.0-flash"
+      GEMINI_MODEL: "gemini-3.5-flash-lite"
+      # Below the BFF's 15 s timeout towards the agent; decompose-epic measured ~8.5 s.
+      GEMINI_TIMEOUT_MS: "13000"
     ports:
       - "3000:3000"
     networks:
