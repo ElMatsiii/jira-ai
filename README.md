@@ -237,6 +237,7 @@ Para desplegar en un clúster local (Minikube, Kind o Docker Desktop K8s):
 ```bash
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/infrastructure/databases-and-kafka.yaml
-kubectl apply -f k8s/apps/microservices-and-bff.yaml
+kubectl apply -f k8s/infrastructure/kafka-topics-job.yaml   # crea issues.events, analytics.query y analytics.reply
+kubectl apply -f k8s/apps/microservices-and-bff.yaml        # MS1, MS2, MS3 y el BFF esperan esos topics (initContainer)
 ```
 Estos manifiestos sirven como base de demostración; aún requieren persistencia duradera para las bases de datos, gestión de secretos y probes antes de considerarse listos para producción. Para probar todo localmente, se recomienda Docker Compose.

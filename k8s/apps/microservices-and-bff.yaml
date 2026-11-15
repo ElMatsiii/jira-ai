@@ -14,6 +14,19 @@ spec:
       labels:
         app: issues-service
     spec:
+      initContainers:
+        # Waits for the topics created by the kafka-init-topics Job (k8s/infrastructure/kafka-topics-job.yaml).
+        - name: wait-kafka-topics
+          image: confluentinc/cp-kafka:7.5.0
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              for topic in issues.events analytics.query analytics.reply; do
+                until kafka-topics --bootstrap-server kafka:9092 --describe --topic "$topic" >/dev/null 2>&1; do
+                  echo "Esperando el topic $topic (Job kafka-init-topics)..."
+                  sleep 5
+                done
+              done
       containers:
         - name: issues-service
           image: jira-issues-service:latest
@@ -64,6 +77,19 @@ spec:
       labels:
         app: sprints-service
     spec:
+      initContainers:
+        # Waits for the topics created by the kafka-init-topics Job (k8s/infrastructure/kafka-topics-job.yaml).
+        - name: wait-kafka-topics
+          image: confluentinc/cp-kafka:7.5.0
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              for topic in issues.events analytics.query analytics.reply; do
+                until kafka-topics --bootstrap-server kafka:9092 --describe --topic "$topic" >/dev/null 2>&1; do
+                  echo "Esperando el topic $topic (Job kafka-init-topics)..."
+                  sleep 5
+                done
+              done
       containers:
         - name: sprints-service
           image: jira-sprints-service:latest
@@ -116,6 +142,19 @@ spec:
       labels:
         app: analytics-service
     spec:
+      initContainers:
+        # Waits for the topics created by the kafka-init-topics Job (k8s/infrastructure/kafka-topics-job.yaml).
+        - name: wait-kafka-topics
+          image: confluentinc/cp-kafka:7.5.0
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              for topic in issues.events analytics.query analytics.reply; do
+                until kafka-topics --bootstrap-server kafka:9092 --describe --topic "$topic" >/dev/null 2>&1; do
+                  echo "Esperando el topic $topic (Job kafka-init-topics)..."
+                  sleep 5
+                done
+              done
       containers:
         - name: analytics-service
           image: jira-analytics-service:latest
@@ -203,6 +242,19 @@ spec:
       labels:
         app: bff-gateway
     spec:
+      initContainers:
+        # Waits for the topics created by the kafka-init-topics Job (k8s/infrastructure/kafka-topics-job.yaml).
+        - name: wait-kafka-topics
+          image: confluentinc/cp-kafka:7.5.0
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              for topic in issues.events analytics.query analytics.reply; do
+                until kafka-topics --bootstrap-server kafka:9092 --describe --topic "$topic" >/dev/null 2>&1; do
+                  echo "Esperando el topic $topic (Job kafka-init-topics)..."
+                  sleep 5
+                done
+              done
       containers:
         - name: bff-gateway
           image: jira-bff-gateway:latest
