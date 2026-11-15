@@ -99,7 +99,7 @@ docker compose ps
 
 ## 3. Fase D: pasos pendientes
 
-Todos los contratos que necesitan los pasos 19, 20, 21, 23 y 24 **ya están en `jira-contracts/main`**. Ninguno de ellos requiere otra ronda de contratos.
+Todos los contratos que necesitan los pasos 19, 20, 21, 23, 24 y 25 **ya están en `jira-contracts/main`**. Ninguno de ellos requiere otra ronda de contratos.
 
 ### Paso 19: capacidad del sprint
 - **Objetivo:** cada sprint guarda su capacidad en story points. Para sugerirla, MS2 pide a MS3 la velocidad histórica del proyecto (Kafka request-reply) y la valida al iniciar el sprint. El BFF y la web exponen el campo.
@@ -153,6 +153,38 @@ Todos los contratos que necesitan los pasos 19, 20, 21, 23 y 24 **ya están en `
 - **Objetivo:** traducir al español los textos que el motor offline todavía devuelve en inglés: desglose, estimación, Gherkin (salvo las palabras clave Given/When/Then) y planificación.
 - **Repo:** solo `jira-mcp-agent`, un commit: `feat(mcp): traduce al español las respuestas del motor offline`.
 - **Contratos y dependencias:** ninguno.
+
+### Paso 25: mover libremente las incidencias en el Tablero
+- **Objetivo:** mover una incidencia en cualquier dirección entre To Do, In Progress, In Review y Done. Hoy solo existe el botón "Avanzar →", y un clic por error no se puede deshacer desde el tablero.
+  - **Con mouse:** arrastrar la tarjeta entre columnas (drag and drop).
+  - **Sin mouse (accesible):** un selector de estado en la tarjeta, o botones "← Retroceder" y "Avanzar →".
+- **Hallazgos al revisar el código:**
+  - **MS1 bloquea parte de los movimientos.** `CanTransition` (`internal/domain/status.go`) permite avanzar de a un paso y solo algunos retrocesos: In Progress→To Do, In Review→In Progress y Done→To Do. Rechaza con `FAILED_PRECONDITION` los saltos (To Do→Done, In Progress→Done) y otros retrocesos (In Review→To Do, Done→In Progress, Done→In Review).
+    - **Cambio:** permitir cualquier transición entre los 4 estados válidos.
+    - Se mantienen: el control de versión (`ErrVersionConflict` → `ABORTED`) y que moverla al mismo estado no emita evento.
+    - **Decisión pendiente:** ¿se permiten también los saltos hacia adelante (To Do→Done)? El pedido dice "en cualquier dirección".
+  - **Contratos:** no requiere cambios. `UpdateIssueStatus(id, status)` ya existe, y `issues.events` ya incluye `previousStatus`.
+  - **MS3 ya lo soporta.**
+    - Con `ISSUE_STATUS_CHANGED`, `HandleIssueStatusChanged` resta de completados y suma a pendientes cuando la historia sale de DONE (`wasDone && !isDone`). Además actualiza el `actualRemaining` del día en el burndown.
+    - Los cambios entre To Do, In Progress e In Review no mueven puntos; solo cuentan para la penalización por trabajo en curso.
+    - Ya hay un test de reapertura en `IssuesEventProcessorTests`. No hace falta un commit en MS3, salvo agregar un test que recorra Done→In Review→Done.
+  - **BFF:** `updateIssueStatus` no traduce los errores de MS1; hoy llega el texto crudo de gRPC. Hay que traducir al menos `ABORTED` ("La incidencia cambió mientras la movías, vuelve a intentarlo") y, si queda alguna regla, `FAILED_PRECONDITION`.
+- **Repos y orden de commits:**
+  1. `jira-issues-go`: `CanTransition` acepta cualquier transición entre estados válidos. → `feat(issues): permite mover incidencias entre cualquier estado`
+  2. `jira-bff`: mensajes en español para los errores de `updateIssueStatus`. → `fix(bff): traduce los errores al cambiar el estado de una incidencia`
+  3. `jira-web`: drag and drop entre columnas, más la alternativa accesible; actualización optimista con vuelta atrás si falla. → `feat(web): mueve incidencias entre columnas del tablero`
+- **Tests sugeridos:**
+  - **MS1:** reescribir la tabla de transiciones en `issue_test.go`, que hoy espera que varios movimientos fallen: ahora todos los pares válidos se aceptan y los estados inválidos se rechazan. En el servicio, verificar que retroceder publica `ISSUE_STATUS_CHANGED` con `previousStatus`.
+  - **MS3 (opcional):** Done→In Review→Done deja completados y pendientes como estaban.
+  - **BFF:** traducción de `ABORTED` y `FAILED_PRECONDITION`.
+  - **Web:**
+    - Soltar una tarjeta en otra columna llama a `updateIssueStatus` con el estado de esa columna.
+    - Soltarla en su propia columna no llama.
+    - Mover con teclado (selector o botones) hacia atrás y hacia adelante.
+    - Si la mutación falla, la tarjeta vuelve a su columna y se muestra el error.
+    - Cobertura ≥ 60 %.
+- **Dependencias:** ninguna. Si se hace antes que el paso 23, más adelante habrá que decidir si mover tarjetas también depende del rol.
+- **Nota técnica:** el drag and drop se puede hacer con la API nativa de HTML5 (`draggable`, `onDragStart`, `onDrop`), sin dependencias nuevas. Si se prefiere una librería (por ejemplo `@dnd-kit`), hay que acordarlo antes, porque agrega una dependencia.
 
 ### Paso 22: descartado
 - El cierre de sprint con pendientes (`CompleteSprintRequest.move_to_sprint_id`) **queda descartado por ahora**.
