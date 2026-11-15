@@ -1,0 +1,36 @@
+# Creates the Kafka topics declared in jira-contracts (idempotent, --if-not-exists).
+# kafka-go (MS1) does not auto-create topics, so they must exist before MS1 publishes.
+# MS1, MS2, MS3 and the BFF wait for these topics with an initContainer
+# (see k8s/apps/microservices-and-bff.yaml). Apply after databases-and-kafka.yaml.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init-topics
+  namespace: jira-ai
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: kafka-init-topics
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-init
+          image: confluentinc/cp-kafka:7.5.0
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              until kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+                echo "Esperando a que Kafka responda en kafka:9092..."
+                sleep 5
+              done
+              create_topic() {
+                kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+                  --topic "$1" --partitions "$2" --replication-factor 1
+              }
+              create_topic issues.events 3
+              create_topic analytics.query 1
+              create_topic analytics.reply 1
+              kafka-topics --bootstrap-server kafka:9092 --describe --topic issues.events

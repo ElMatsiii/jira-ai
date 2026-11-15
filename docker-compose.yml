@@ -43,6 +43,30 @@ services:
     networks:
       - jira-network
 
+  # One-shot: creates the Kafka topics declared in jira-contracts (idempotent, --if-not-exists).
+  # Needed because kafka-go (MS1) does not auto-create topics; services wait for it to finish.
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: jira-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        create_topic() {
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic "$$1" --partitions "$$2" --replication-factor 1
+        }
+        create_topic issues.events 3
+        create_topic analytics.query 1
+        create_topic analytics.reply 1
+        kafka-topics --bootstrap-server kafka:9092 --describe --topic issues.events
+    restart: "no"
+    networks:
+      - jira-network
+
   # Database 1: PostgreSQL for MS1 Issues & Projects
   postgres-issues:
     image: postgres:15-alpine
@@ -113,6 +137,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       PORT: "50051"
       DATABASE_URL: postgres://jira_user:jira_password@postgres-issues:5432/issues_db?sslmode=disable
@@ -146,6 +172,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       PORT: "50052"
       DB_HOST: postgres-sprints
@@ -183,6 +211,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       MONGODB_URI: mongodb://mongo-analytics:27017
       MONGODB_DATABASE: analytics_db
@@ -202,7 +232,9 @@ services:
     environment:
       PORT: "3000"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
-      GEMINI_MODEL: "gemini-2.0-flash"
+      GEMINI_MODEL: "gemini-3.5-flash-lite"
+      # Below the BFF's 15 s timeout towards the agent; decompose-epic measured ~8.5 s.
+      GEMINI_TIMEOUT_MS: "13000"
     ports:
       - "3000:3000"
     networks:
@@ -215,8 +247,6 @@ services:
       dockerfile: ./jira-bff/Dockerfile
     container_name: jira-bff-gateway
     depends_on:
-      postgres-issues:
-        condition: service_healthy
       issues-service:
         condition: service_healthy
       sprints-service:
@@ -225,13 +255,14 @@ services:
         condition: service_started
       mcp-agent:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       PORT: "4000"
       ISSUES_GRPC_URL: issues-service:50051
       SPRINTS_GRPC_URL: sprints-service:50052
       KAFKA_BROKERS: kafka:9092
       MCP_AGENT_URL: http://mcp-agent:3000
-      DATABASE_URL: postgresql://jira_user:jira_password@postgres-issues:5432/issues_db
       JWT_SECRET: "${JWT_SECRET:-local-development-secret-change-before-deploy}"
     ports:
       - "4000:4000"
