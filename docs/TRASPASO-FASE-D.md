@@ -233,6 +233,7 @@ Todos los contratos que necesitan los pasos 19, 20, 21, 23, 24 y 25 **ya están 
 | 10 | MS3 sin MS2 | Si MS2 no responde, MS3 no conoce el compromiso inicial y no detecta aumento de alcance (prefiere no avisar a avisar en falso). |
 | 11 | README de la raíz | La sección "Probar el flujo de usuario" todavía describe la invitación al espacio; hoy se invita desde "Miembros del proyecto". |
 | 12 | Autor de la incidencia | `reporter_name` se resuelve comparando `app_users.id::text` con `issues.reporter_id` (VARCHAR). Funciona, pero no usa índice; si crece mucho, conviene migrar `reporter_id` a UUID. |
+| 13 | CI de jira-issues-go | El paso "Verify Module Dependencies" ya no usa `go mod verify`: falla siempre porque el módulo local `jira-contracts` (incluido con `replace`) no tiene un nombre válido para la caché de Go (no lleva punto en su ruta). Ahora usa `go mod download` más `go mod tidy` y `git diff --exit-code -- go.mod go.sum`. La solución de fondo sería renombrar el módulo (por ejemplo a `github.com/ElMatsiii/jira-contracts`). Eso exige cambiar el `go_package` de los `.proto`, regenerar `gen/go` y actualizar los imports de MS1: es otra ronda de contratos. |
 
 ---
 
