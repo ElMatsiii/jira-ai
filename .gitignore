@@ -16,6 +16,7 @@ obj/
 coverage/
 *.out
 *.log
+resumen_cambios_jira_ai.*
 
 # OS metadata
 .DS_Store

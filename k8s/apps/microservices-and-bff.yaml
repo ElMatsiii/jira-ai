@@ -211,6 +211,12 @@ spec:
             # Below the BFF's 15 s timeout towards the agent; decompose-epic measured ~8.5 s.
             - name: GEMINI_TIMEOUT_MS
               value: "13000"
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: jira-ai-secrets
+                  key: GEMINI_API_KEY
+                  optional: true
           ports:
             - containerPort: 3000
 ---
@@ -270,6 +276,12 @@ spec:
               value: "kafka:9092"
             - name: MCP_AGENT_URL
               value: "http://mcp-agent:3000"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jira-ai-secrets
+                  key: JWT_SECRET
+                  optional: true
           ports:
             - containerPort: 4000
 ---
