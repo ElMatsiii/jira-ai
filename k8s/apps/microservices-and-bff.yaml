@@ -265,7 +265,7 @@ spec:
               done
       containers:
         - name: bff-gateway
-          image: jira-bff-gateway:latest
+          image: jira-bff-gateway:v2
           imagePullPolicy: IfNotPresent
           env:
             - name: PORT
@@ -319,7 +319,7 @@ spec:
     spec:
       containers:
         - name: web-frontend
-          image: jira-web-frontend:latest
+          image: jira-web-frontend:v2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
